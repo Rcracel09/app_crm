@@ -1,0 +1,27 @@
+image: app-crm:local
+replicas: 1
+port: 8080
+
+requiresAuth: true
+
+env:
+  DB_HOST: "customer-db"
+  DB_PORT: "5432"
+  DB_NAME: "demo_db"
+  DB_USER: "postgres"
+  DB_PASSWORD: "postgres123"
+
+resources:
+  limits:
+    cpu: "300m"
+    memory: "256Mi"
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+
+serviceType: NodePort
+
+ingress:
+  host: app-crm.local
+  path: /
+  class: nginx
