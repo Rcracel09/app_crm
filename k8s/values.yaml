@@ -9,7 +9,7 @@ requiresAuth: true
 
 env:
   # Database connection (connects to database_crm service)
-  DB_HOST: "database-crm"
+  DB_HOST: "database-crm-svc"
   DB_PORT: "5432"
   DB_NAME: "demo_db"
   DB_USER: "postgres"
