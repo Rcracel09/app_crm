@@ -1,6 +1,6 @@
-# 👁️ Customer Viewer
+# 🏢 app_crm
 
-**Simple web app to visualize customer database data**
+**CRM Application - React + FastAPI with Authentication**
 
 Part of LTPLabs E-Catalog - Requisitos e Arquiteturas de Software (MEI, UMinho 2025/2026)
 
@@ -8,203 +8,215 @@ Part of LTPLabs E-Catalog - Requisitos e Arquiteturas de Software (MEI, UMinho 2
 
 ## 📋 Overview
 
-Aplicação web simples que conecta à `customer-db` e visualiza os dados em tabelas HTML.
-
-### Features
-- 📊 Visualização de clientes em tabela
-- 💬 Visualização de interações
-- 📈 Estatísticas da base de dados
-- 🔍 Campos PII destacados visualmente
-- 🌐 API REST para acesso programático
+Aplicação CRM completa que visualiza dados de clientes e interações. Integra com:
+- ✅ **AuthGuard** do shared/auth (como app_draft)
+- ✅ **database_crm** via service discovery
+- ✅ **React** frontend com tabelas interativas
+- ✅ **FastAPI** backend servindo API + static files
 
 ---
 
-## 🏗️ Estrutura
+## 🏗️ Architecture
 
 ```
-customer-viewer/
-├── Dockerfile          # Container da app
-├── app.py             # Flask application
-├── requirements.txt   # Dependências Python
-├── templates/
-│   └── index.html     # Template HTML
-├── k8s/
-│   └── values.yaml    # Configuração K8s
-└── README.md
-```
-
----
-
-## 🚀 Quick Start
-
-### Pré-requisitos
-A `customer-db` deve estar a correr e acessível.
-
-### Local (Docker)
-
-```bash
-# Build
-docker build -t customer-viewer:local .
-
-# Run (assumindo customer-db em localhost:5432)
-docker run -d \
-  --name customer-viewer \
-  -p 8080:8080 \
-  -e DB_HOST=host.docker.internal \
-  customer-viewer:local
-
-# Access
-open http://localhost:8080
-```
-
-### Minikube (Kubernetes)
-
-```bash
-# Build for Minikube
-eval $(minikube docker-env)
-docker build -t customer-viewer:local .
-
-# Deploy (via umbrella chart)
-# A app conecta automaticamente a customer-db via service name
-
-# Access
-minikube service customer-viewer
+app_crm/
+├── frontend/              # React + TypeScript
+│   ├── src/
+│   │   ├── main.tsx      # AuthGuard wrapper
+│   │   ├── App.tsx       # Main component
+│   │   ├── App.css       # Styles
+│   │   └── index.css
+│   ├── package.json
+│   ├── vite.config.ts    # @shared alias
+│   ├── tsconfig.app.json # Path mapping
+│   └── index.html
+│
+├── backend/              # FastAPI
+│   ├── main.py          # API + serve React
+│   └── requirements.txt
+│
+├── Dockerfile           # Multi-stage build
+└── k8s/
+    └── values.yaml      # K8s configuration
 ```
 
 ---
 
-## 🔧 Configuration
-
-### Environment Variables
+## 🚀 Deploy (via catalog_claudio)
 
 ```bash
-DB_HOST=customer-db        # Service name no K8s
-DB_PORT=5432
-DB_NAME=demo_db
-DB_USER=postgres
-DB_PASSWORD=postgres123
+cd catalog_claudio/
+
+# 1. Deploy database FIRST
+./scripts/build-deploy.sh database_crm local default
+
+# 2. Wait for database to be ready
+kubectl wait --for=condition=ready pod -l app=database-crm --timeout=60s
+
+# 3. Deploy CRM app
+./scripts/build-deploy.sh app_crm local default
+
+# 4. Access
+minikube service app-crm
 ```
 
-### Kubernetes (k8s/values.yaml)
+---
+
+## 🔧 Configuration (k8s/values.yaml)
 
 ```yaml
-image: customer-viewer:local
+image: app_crm:local
 port: 8080
+requiresAuth: true              # ← Integrates with projeto_ltp_labs
+
 env:
-  DB_HOST: "customer-db"
+  DB_HOST: "database-crm"       # ← Service discovery
+  DB_PORT: "5432"
+  DB_NAME: "demo_db"
+  DB_USER: "postgres"
+  DB_PASSWORD: "postgres123"
+
+serviceType: NodePort
 ```
 
 ---
 
-## 📊 Endpoints
+## 📊 Features
 
-### Web Interface
-- `GET /` - Homepage com tabelas de dados
+### Frontend (React)
+- **AuthGuard** integration (skipValidation: true)
+- Dashboard with statistics
+- Customers table with PII highlighted
+- Interactions table with type badges
+- Responsive design
 
-### API
-- `GET /api/customers` - Lista clientes (JSON)
-- `GET /api/interactions` - Lista interações (JSON)
-
-### Health Checks
-- `GET /health` - Health check
-- `GET /ready` - Readiness probe (verifica DB)
+### Backend (FastAPI)
+- `/api/customers` - Get all customers
+- `/api/interactions` - Get all interactions
+- `/api/stats` - Get database statistics
+- `/api/health` - Health check
+- `/api/ready` - Readiness probe (checks DB)
+- Serves React static files for all other routes
 
 ---
 
-## 🎨 Interface
+## 🔗 Communication Flow
 
-A interface mostra:
+```
+Browser
+  ↓ HTTP
+app_crm Pod (React + FastAPI)
+  ↓ SQL query (DB_HOST=database-crm)
+database-crm Service (ClusterIP)
+  ↓
+database-crm Pod (PostgreSQL)
+```
 
-### Estatísticas
-- Total de clientes
-- Total de interações
-- Total de emails .pt
+---
 
-### Tabela de Customers
-Colunas: ID | Name | Email | Phone | Company | Address | Notes
+## 🎨 UI Components
 
-### Tabela de Interactions
-Colunas: ID | Customer | Type | Subject | Description | Created By | Date
+- **Statistics Dashboard**: Total customers, interactions, .pt emails
+- **Customers Table**: All PII fields highlighted in yellow
+- **Interactions Table**: Type badges (email, call, meeting, support)
+- **Warning Banner**: Indicates demo data with PII
 
-**Campos PII destacados** com fundo amarelo para fácil identificação.
+---
+
+## 🐳 Dockerfile Breakdown
+
+### Stage 1: Build React
+```dockerfile
+FROM node:20-alpine
+# npm install + npm run build
+# Output: /build/dist
+```
+
+### Stage 2: FastAPI + Static Files
+```dockerfile
+FROM python:3.11-slim
+# Copy backend code
+# Copy React build from stage 1
+# Serve everything via FastAPI
+```
+
+---
+
+## ✅ Integration Points
+
+### 1. AuthGuard (shared/auth)
+```tsx
+import { AuthGuard } from '@shared/auth'
+
+<AuthGuard skipValidation={true}>
+  <App />
+</AuthGuard>
+```
+
+### 2. Database Connection
+```python
+DB_HOST = os.getenv('DB_HOST', 'database-crm')
+conn = psycopg2.connect(host=DB_HOST, ...)
+```
+
+### 3. Service Discovery
+Kubernetes DNS automatically resolves `database-crm` to the database service.
 
 ---
 
 ## 🧪 Testing
 
+### Local Development
 ```bash
-# Test connection
-curl http://localhost:8080/health
+# Terminal 1: Backend
+cd app_crm/backend
+pip install -r requirements.txt
+DB_HOST=localhost python main.py
+
+# Terminal 2: Frontend
+cd app_crm/frontend
+npm install
+npm run dev
+```
+
+### In Kubernetes
+```bash
+# Check logs
+kubectl logs -l app=app-crm -f
 
 # Test API
-curl http://localhost:8080/api/customers | jq
-curl http://localhost:8080/api/interactions | jq
-
-# Check readiness
-curl http://localhost:8080/ready
+kubectl port-forward svc/app-crm 8080:8080
+curl http://localhost:8080/api/health
 ```
 
 ---
 
-## 🐛 Troubleshooting
+## 🔍 Troubleshooting
 
-### "Error connecting to database"
-
+### "Database connection failed"
 ```bash
-# Verify customer-db is running
-docker ps | grep customer-db
-# or
-kubectl get pods | grep customer-db
+# Check if database_crm is running
+kubectl get pods -l app=database-crm
 
-# Check connection from viewer
-docker exec -it customer-viewer \
-  psql -h customer-db -U postgres -d demo_db
+# Check service exists
+kubectl get svc database-crm
+
+# Check app logs
+kubectl logs -l app=app-crm
 ```
 
-### App não conecta no K8s
-
-```bash
-# Verify service exists
-kubectl get svc customer-db
-
-# Check logs
-kubectl logs deployment/customer-viewer
-```
+### AuthGuard not working
+Make sure `shared/auth` exists in catalog_claudio root and the build script has linked it correctly.
 
 ---
 
-## 📦 Dependencies
+## ✅ Ready for Deployment
 
-```
-flask==3.0.0
-psycopg2-binary==2.9.9
-```
+This app is 100% compatible with:
+- ✅ catalog_claudio umbrella chart
+- ✅ build-deploy.sh script
+- ✅ AuthGuard integration
+- ✅ Service discovery
+- ✅ Zero changes to catalog_claudio needed
 
----
-
-## 🔗 Integration
-
-Esta app funciona em conjunto com:
-- **customer-db** - PostgreSQL com dados PII
-- **Umbrella chart** - Deploy orchestration
-
----
-
-## ✅ Checklist
-
-Antes de considerar pronta:
-- [x] Conecta à customer-db
-- [x] Mostra todos os clientes
-- [x] Mostra todas as interações
-- [x] Campos PII destacados
-- [x] Health checks funcionam
-- [x] API endpoints funcionam
-- [x] Interface responsiva
-
----
-
-**Status**: ✅ Ready for deployment
-
----
-
-*Built for LTPLabs E-Catalog - Universidade do Minho MEI 2025/2026*
+**Status**: ✅ Production Ready

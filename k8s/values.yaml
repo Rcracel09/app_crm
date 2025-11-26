@@ -1,11 +1,15 @@
-image: app-crm:local
+# This file is intended to be consumed by the umbrella chart script.
+# It's not the full "apps" map — the deploy script wraps it under apps.<n>
+image: app_crm:local
 replicas: 1
 port: 8080
 
+# Authentication requirement (integrates with projeto_ltp_labs)
 requiresAuth: true
 
 env:
-  DB_HOST: "customer-db"
+  # Database connection (connects to database_crm service)
+  DB_HOST: "database-crm"
   DB_PORT: "5432"
   DB_NAME: "demo_db"
   DB_USER: "postgres"
@@ -13,11 +17,11 @@ env:
 
 resources:
   limits:
-    cpu: "300m"
-    memory: "256Mi"
+    cpu: "500m"
+    memory: "512Mi"
   requests:
-    cpu: "100m"
-    memory: "128Mi"
+    cpu: "200m"
+    memory: "256Mi"
 
 serviceType: NodePort
 
