@@ -128,7 +128,7 @@ def get_interactions() -> Dict[str, Any]:
                 i.created_by,
                 i.created_at
             FROM interactions i
-            JOIN customers c ON i.customer_id = c.id
+            JOIN customers c ON i.custom_id = c.id
             ORDER BY i.created_at DESC
         """)
         
